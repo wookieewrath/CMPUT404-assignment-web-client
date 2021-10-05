@@ -31,9 +31,6 @@ class HTTPResponse(object):
     def __init__(self, code=200, body=""):
         self.code = code
         self.body = body
-    def __str__(self):
-        string = str(self.code) + str(self.body)
-        return string
 
 class HTTPClient(object):
     #def get_host_port(self,url):
@@ -76,12 +73,13 @@ class HTTPClient(object):
     def get_body(self, data):
         return data.split('\r\n')[-1]
 
+    # Do a GET request
     def GET(self, url, args=None):
         url_host = urllib.parse.urlparse(url).netloc.split(':')[0]
         url_path = urllib.parse.urlparse(url).path
+        url_path = url_path if url_path != '' else '/'
         url_port = 80 if urllib.parse.urlparse(url).port == None else urllib.parse.urlparse(url).port
         request = f'GET {url_path} HTTP/1.1\r\nHost: {url_host}\r\nConnection: close\r\nAccept: text/html, application/x-www-form-urlencoded\r\n\r\n'
-        
         self.connect(url_host, url_port)
         self.sendall(request)
         data=self.recvall(self.socket)
@@ -90,13 +88,35 @@ class HTTPClient(object):
         print(self.get_body(data))
         return HTTPResponse(int(self.get_code(data)), self.get_body(data))
 
+    # Do a POST request
     def POST(self, url, args=None):
-        code = 500
-        body = ""
-        return HTTPResponse(code, body)
+        url_host = urllib.parse.urlparse(url).netloc.split(':')[0]
+        url_path = urllib.parse.urlparse(url).path
+        url_port = 80 if urllib.parse.urlparse(url).port == None else urllib.parse.urlparse(url).port
+        data_size = 0
+        if args!=None:
+            data = ''
+            for i, (k, v) in enumerate(args.items()):
+                if i == len(args) - 1:
+                    data = data + (k + '=' + v)
+                else:
+                    data = data + (k + '=' + v + '&')
+            data_size = len(data.encode('utf-8'))
+
+        request = f'POST {url_path} HTTP/1.1\r\nHost: {url_host}\r\nConnection: close\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: {data_size}\r\n\r\n'
+        request = request + data if args!=None else request
+
+        self.connect(url_host, url_port)
+        self.sendall(request)
+        data=self.recvall(self.socket)
+        self.close()
+        print(int(self.get_code(data)))
+        print(self.get_body(data))
+        return HTTPResponse(int(self.get_code(data)), self.get_body(data))
 
     def command(self, url, command="GET", args=None):
         if (command == "POST"):
+            print(args)
             return self.POST( url, args )
         else:
             return self.GET( url, args )
@@ -108,8 +128,13 @@ if __name__ == "__main__":
         help()
         sys.exit(1)
     elif (len(sys.argv) == 3):
-        #print('You asked for: ', sys.argv[1], sys.argv[2])
+        #print('You asked for: ', sys.argv[0], sys.argv[1], sys.argv[2])
         print(client.command( sys.argv[2], sys.argv[1] ))
     else:
         #print('You asked for: ', sys.argv[1])
         print(client.command( sys.argv[1] ))
+
+# Sources Consulted:
+#
+# For enumerate over a dictionary:
+# https://stackoverflow.com/questions/20838839/how-to-get-the-last-item-of-the-dictionary-when-looping?rq=1
